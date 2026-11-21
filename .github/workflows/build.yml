@@ -7,10 +7,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: ZIP entpacken
-        run: unzip -q Sbs.zip
+      - name: ZIP entpacken und Projekt suchen
+        run: |
+          mkdir proj
+          unzip -q Sbs.zip -d proj
+          find proj -maxdepth 3 | head -30
+          ROOT=$(dirname "$(find proj -name settings.gradle.kts | head -1)")
+          echo "Projekt liegt in: $ROOT"
+          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
       - name: compileSdk auf 36 setzen
-        run: sed -i 's/compileSdk = 37/compileSdk = 36/' SB/app/build.gradle.kts
+        run: sed -i 's/compileSdk = 37/compileSdk = 36/' "$ROOT/app/build.gradle.kts"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -24,9 +30,9 @@ jobs:
           gradle-version: 9.6.0
           cache-disabled: true
       - name: Build debug APK
-        working-directory: SB
+        working-directory: ${{ env.ROOT }}
         run: gradle :app:assembleDebug
       - uses: actions/upload-artifact@v4
         with:
           name: SecureBrowse-debug-apk
-          path: SB/app/build/outputs/apk/debug/*.apk
+          path: ${{ env.ROOT }}/app/build/outputs/apk/debug/*.apk
