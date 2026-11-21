@@ -11,9 +11,7 @@ jobs:
         run: |
           mkdir proj
           unzip -q Sbs.zip -d proj
-          find proj -maxdepth 3 | head -30
           ROOT=$(dirname "$(find proj -name settings.gradle.kts | head -1)")
-          echo "Projekt liegt in: $ROOT"
           echo "ROOT=$ROOT" >> "$GITHUB_ENV"
       - name: compileSdk auf 36 setzen
         run: sed -i 's/compileSdk = 37/compileSdk = 36/' "$ROOT/app/build.gradle.kts"
@@ -31,7 +29,12 @@ jobs:
           cache-disabled: true
       - name: Build debug APK
         working-directory: ${{ env.ROOT }}
-        run: gradle :app:assembleDebug
+        run: gradle :app:assembleDebug > build.log 2>&1 || touch FAILED
+      - name: Fehler anzeigen
+        working-directory: ${{ env.ROOT }}
+        run: |
+          grep -E "^e: |What went wrong" -A3 build.log | head -60 || true
+          test ! -f FAILED
       - uses: actions/upload-artifact@v4
         with:
           name: SecureBrowse-debug-apk
