@@ -13,16 +13,18 @@ jobs:
           unzip -q Sbs.zip -d proj
           ROOT=$(dirname "$(find proj -name settings.gradle.kts | head -1)")
           echo "ROOT=$ROOT" >> "$GITHUB_ENV"
-      - name: compileSdk auf 36 setzen
-        run: sed -i 's/compileSdk = 37/compileSdk = 36/' "$ROOT/app/build.gradle.kts"
+      - name: Code-Fehler in BrowserStore.kt beheben
+        run: perl -0pi -e 's/(private fun encodeHistory\(.*?\n    \})\n/$1.toString()\n/s' "$ROOT/app/src/main/java/de/deinname/securebrowse/data/BrowserStore.kt"
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 21
       - name: Install SDK platform
         run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
+          SDK="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDK" --licenses > /dev/null || true
+          "$SDK" --list 2>/dev/null | grep -E "platforms;android-3[6-9]" | head -20 || true
+          "$SDK" "platforms;android-37.0" || "$SDK" "platforms;android-37"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.6.0
@@ -33,7 +35,7 @@ jobs:
       - name: Fehler anzeigen
         working-directory: ${{ env.ROOT }}
         run: |
-          grep -E "^e: |What went wrong" -A3 build.log | head -60 || true
+          grep -E "^e: |What went wrong|requires|issues were found" -A4 build.log | head -80 || true
           test ! -f FAILED
       - uses: actions/upload-artifact@v4
         with:
