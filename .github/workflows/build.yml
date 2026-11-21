@@ -8,7 +8,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: ZIP entpacken
-        run: unzip -q SB.zip
+        run: unzip -q Sbs.zip
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
