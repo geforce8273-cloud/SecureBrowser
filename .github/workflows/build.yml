@@ -9,6 +9,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: ZIP entpacken
         run: unzip -q Sbs.zip
+      - name: compileSdk auf 36 setzen
+        run: sed -i 's/compileSdk = 37/compileSdk = 36/' SB/app/build.gradle.kts
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -16,7 +18,7 @@ jobs:
       - name: Install SDK platform
         run: |
           yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37"
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: 9.6.0
