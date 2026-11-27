@@ -118,7 +118,27 @@ jobs:
                       return s[:a] + block + "\n" + s[a:]
                   return s[:k] + block + "\n" + s[k:]
               rw(p, f)
+
+          # 6) Tests: falsch escapte Testtexte (doppelter Backslash)
+          p = find("PromptSafetyTest.kt")
+          if p:
+              rw(p, lambda s: s.replace(BS * 2 + "u", BS + "u"))
+          p = find("VpnProfileValidationTest.kt")
+          if p:
+              rw(p, lambda s: s.replace('"bad' + BS * 2 + 'nname"', '"bad' + BS + 'nname"'))
           PY
+
+      - name: llama.cpp vervollständigen
+        run: |
+          LL="$PROJECT_DIR/app/src/main/cpp/llama.cpp"
+          if [ -d "$PROJECT_DIR/app/src/main/cpp" ] && [ ! -f "$LL/cmake/build-info.cmake" ]; then
+            echo "llama.cpp ist unvollständig - lade b10000 von GitHub"
+            rm -rf "$LL"
+            git clone --depth 1 --branch b10000 https://github.com/ggml-org/llama.cpp "$LL"
+            rm -rf "$LL/.git"
+          else
+            echo "llama.cpp ist vollständig"
+          fi
 
       - name: Gradle 9.1.0 installieren
         uses: gradle/actions/setup-gradle@v4
