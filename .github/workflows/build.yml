@@ -58,6 +58,18 @@ jobs:
           echo "SDK: $ANDROID_HOME"
           ls "$ANDROID_HOME"
 
+      - name: Compose Icons Version korrigieren
+        run: |
+          find "$PROJECT_DIR" -type f \
+            \( -name "*.gradle" \
+            -o -name "*.gradle.kts" \
+            -o -name "*.toml" \) \
+            -exec sed -i \
+            '/material-icons-extended/s/1\.9\.4/1.7.8/g' {} +
+
+          echo "Prüfung der Icons-Abhängigkeit:"
+          grep -R "material-icons-extended" "$PROJECT_DIR" || true
+
       - name: Debug APK bauen
         run: |
           cd "$PROJECT_DIR"
