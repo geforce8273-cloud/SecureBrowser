@@ -61,17 +61,17 @@ jobs:
       - name: Debug APK bauen
         run: |
           cd "$PROJECT_DIR"
-          gradle assembleDebug
+          gradle --refresh-dependencies assembleDebug --stacktrace
 
       - name: Unit Tests
         run: |
           cd "$PROJECT_DIR"
-          gradle test
+          gradle --refresh-dependencies test
 
       - name: Release APK bauen
         run: |
           cd "$PROJECT_DIR"
-          gradle assembleRelease
+          gradle --refresh-dependencies assembleRelease
 
       - name: APKs hochladen
         uses: actions/upload-artifact@v4
