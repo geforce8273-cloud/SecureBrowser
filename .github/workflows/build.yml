@@ -79,12 +79,15 @@ jobs:
         with:
           gradle-version: '9.1.0'
 
-      - name: Android SDK einrichten
-        uses: android-actions/setup-android@v3
-
       - name: NDK und CMake installieren
         run: |
-          sdkmanager "ndk;28.2.13676358" "cmake;3.22.1"
+          SDKM="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKM" ]; then
+            SDKM=$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)
+          fi
+          echo "sdkmanager: $SDKM"
+          yes | "$SDKM" --licenses > /dev/null || true
+          "$SDKM" "ndk;28.2.13676358" "cmake;3.22.1" || echo "Installation fehlgeschlagen - Gradle versucht es selbst"
 
       - name: Debug APK bauen
         run: |
