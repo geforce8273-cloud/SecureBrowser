@@ -21,43 +21,57 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Android SDK verwenden
+      - name: ZIP-Dateien entpacken
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME"
+          find . -type f -name "*.zip" \
+            -not -path "./.git/*" | while read ZIP; do
+              unzip -o "$ZIP" -d extracted
+          done
 
-      - name: Projekt automatisch finden
+      - name: Android Projekt finden
         run: |
-          GRADLEW=$(find . -type f -name gradlew | head -n 1)
+          PROJECT=$(find . -type f \
+            \( -name "settings.gradle" \
+            -o -name "settings.gradle.kts" \) \
+            -not -path "./.git/*" \
+            | head -n 1)
 
-          if [ -z "$GRADLEW" ]; then
-            echo "gradlew wurde nicht gefunden!"
+          if [ -z "$PROJECT" ]; then
+            echo "Kein Android Gradle Projekt gefunden!"
+            find . -maxdepth 4 -type f
             exit 1
           fi
 
-          PROJECT_DIR=$(dirname "$GRADLEW")
-          PROJECT_DIR=$(realpath "$PROJECT_DIR")
+          DIR=$(dirname "$PROJECT")
+          DIR=$(realpath "$DIR")
 
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
-          echo "Projekt gefunden: $PROJECT_DIR"
+          echo "PROJECT_DIR=$DIR" >> $GITHUB_ENV
+          echo "Projekt gefunden: $DIR"
 
-      - name: Gradle ausführbar machen
-        run: chmod +x "$PROJECT_DIR/gradlew"
+      - name: Gradle installieren
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.14.3'
+
+      - name: Android SDK prüfen
+        run: |
+          echo "SDK: $ANDROID_HOME"
+          ls "$ANDROID_HOME"
 
       - name: Debug APK bauen
         run: |
           cd "$PROJECT_DIR"
-          ./gradlew assembleDebug
+          gradle assembleDebug
 
       - name: Unit Tests
         run: |
           cd "$PROJECT_DIR"
-          ./gradlew test
+          gradle test
 
       - name: Release APK bauen
         run: |
           cd "$PROJECT_DIR"
-          ./gradlew assembleRelease
+          gradle assembleRelease
 
       - name: APKs hochladen
         uses: actions/upload-artifact@v4
