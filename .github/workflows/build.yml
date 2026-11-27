@@ -1,43 +1,52 @@
-name: Build APK
+name: SecureBrowse Android Build
+
 on:
-  push:
   workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-      - name: ZIP entpacken und Projekt suchen
-        run: |
-          mkdir proj
-          unzip -q Sbs.zip -d proj
-          ROOT=$(dirname "$(find proj -name settings.gradle.kts | head -1)")
-          echo "ROOT=$ROOT" >> "$GITHUB_ENV"
-      - name: Code-Fehler in BrowserStore.kt beheben
-        run: perl -0pi -e 's/(private fun encodeHistory\(.*?\n    \})\n/$1.toString()\n/s' "$ROOT/app/src/main/java/de/deinname/securebrowse/data/BrowserStore.kt"
-      - uses: actions/setup-java@v4
+      - name: Repository herunterladen
+        uses: actions/checkout@v4
+
+      - name: Java einrichten
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: 21
-      - name: Install SDK platform
+          java-version: '17'
+
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
+      - name: Projektpfad festlegen
         run: |
-          SDK="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
-          yes | "$SDK" --licenses > /dev/null || true
-          "$SDK" --list 2>/dev/null | grep -E "platforms;android-3[6-9]" | head -20 || true
-          "$SDK" "platforms;android-37.1" || "$SDK" "platforms;android-37.0"
-      - uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: 9.6.0
-          cache-disabled: true
-      - name: Build debug APK
-        working-directory: ${{ env.ROOT }}
-        run: gradle :app:assembleDebug > build.log 2>&1 || touch FAILED
-      - name: Fehler anzeigen
-        working-directory: ${{ env.ROOT }}
+          cd salvage/SecureBrowse-v19
+          echo "PROJECT_DIR=$PWD" >> $GITHUB_ENV
+
+      - name: Debug APK bauen
+        working-directory: salvage/SecureBrowse-v19
         run: |
-          grep -E "^e: |What went wrong|requires|issues were found" -A8 build.log | head -120 || true
-          test ! -f FAILED
-      - uses: actions/upload-artifact@v4
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Unit Tests
+        working-directory: salvage/SecureBrowse-v19
+        run: ./gradlew test
+
+      - name: Release APK bauen
+        working-directory: salvage/SecureBrowse-v19
+        run: ./gradlew assembleRelease
+
+      - name: APKs hochladen
+        uses: actions/upload-artifact@v4
         with:
-          name: SecureBrowse-debug-apk
-          path: ${{ env.ROOT }}/app/build/outputs/apk/debug/*.apk
+          name: SecureBrowse-APKs
+          path: |
+            salvage/SecureBrowse-v19/app/build/outputs/apk/debug/*.apk
+            salvage/SecureBrowse-v19/app/build/outputs/apk/release/*.apk
