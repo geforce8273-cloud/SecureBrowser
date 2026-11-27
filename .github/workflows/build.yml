@@ -25,31 +25,44 @@ jobs:
         run: |
           echo "ANDROID_HOME=$ANDROID_HOME"
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME"
-          echo "$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-      - name: Projektpfad festlegen
+      - name: Projekt automatisch finden
         run: |
-          cd salvage/SecureBrowse-v19
-          echo "PROJECT_DIR=$PWD" >> $GITHUB_ENV
+          GRADLEW=$(find . -type f -name gradlew | head -n 1)
+
+          if [ -z "$GRADLEW" ]; then
+            echo "gradlew wurde nicht gefunden!"
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$GRADLEW")
+          PROJECT_DIR=$(realpath "$PROJECT_DIR")
+
+          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          echo "Projekt gefunden: $PROJECT_DIR"
+
+      - name: Gradle ausführbar machen
+        run: chmod +x "$PROJECT_DIR/gradlew"
 
       - name: Debug APK bauen
-        working-directory: salvage/SecureBrowse-v19
         run: |
-          chmod +x gradlew
+          cd "$PROJECT_DIR"
           ./gradlew assembleDebug
 
       - name: Unit Tests
-        working-directory: salvage/SecureBrowse-v19
-        run: ./gradlew test
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew test
 
       - name: Release APK bauen
-        working-directory: salvage/SecureBrowse-v19
-        run: ./gradlew assembleRelease
+        run: |
+          cd "$PROJECT_DIR"
+          ./gradlew assembleRelease
 
       - name: APKs hochladen
         uses: actions/upload-artifact@v4
         with:
           name: SecureBrowse-APKs
           path: |
-            salvage/SecureBrowse-v19/app/build/outputs/apk/debug/*.apk
-            salvage/SecureBrowse-v19/app/build/outputs/apk/release/*.apk
+            **/build/outputs/apk/debug/*.apk
+            **/build/outputs/apk/release/*.apk
