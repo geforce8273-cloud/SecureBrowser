@@ -53,82 +53,81 @@ jobs:
         with:
           gradle-version: '9.1.0'
 
-      - name: Android SDK prüfen
-        run: |
-          echo "SDK: $ANDROID_HOME"
-          ls "$ANDROID_HOME"
-
-      - name: Icons-Abhängigkeit korrigieren
-        run: |
-          python3 - <<'PY'
-          import os
-
-          project = os.environ.get("PROJECT_DIR")
-          if not project:
-              print("PROJECT_DIR fehlt")
-              exit(1)
-
-          extensions = (".gradle", ".gradle.kts", ".toml")
-
-          for root, dirs, files in os.walk(project):
-              dirs[:] = [d for d in dirs if d not in
-                         ("build", ".gradle")]
-
-              for name in files:
-                  if not name.endswith(extensions):
-                      continue
-
-                  path = os.path.join(root, name)
-
-                  try:
-                      with open(path, "r", encoding="utf-8") as f:
-                          content = f.read()
-                  except Exception:
-                      continue
-
-                  updated = content.replace("1.9.4", "1.7.8")
-
-                  if updated != content:
-                      with open(path, "w", encoding="utf-8") as f:
-                          f.write(updated)
-                      print("Version geändert:", path)
-
-          print("Suche nach Icons-Abhängigkeit:")
-          for root, dirs, files in os.walk(project):
-              dirs[:] = [d for d in dirs if d not in
-                         ("build", ".gradle")]
-
-              for name in files:
-                  if name.endswith(extensions):
-                      path = os.path.join(root, name)
-                      try:
-                          with open(path, encoding="utf-8") as f:
-                              for line in f:
-                                  if "material-icons-extended" in line:
-                                      print(path, ":", line.strip())
-                      except Exception:
-                          pass
-          PY
-
       - name: Debug APK bauen
+        id: debug
+        continue-on-error: true
         run: |
           cd "$PROJECT_DIR"
-          gradle --refresh-dependencies assembleDebug --stacktrace
+          set -o pipefail
+          gradle assembleDebug --stacktrace \
+            2>&1 | tee "$GITHUB_WORKSPACE/debug.log" \
+            | grep -E \
+            "^(e: |w: |ERROR:|FAILURE:|BUILD FAILED|> Task .*FAILED|Caused by:)" \
+            || true
+
+          if grep -q "BUILD SUCCESSFUL" debug.log; then
+            exit 0
+          fi
+
+          if grep -q "BUILD FAILED" debug.log; then
+            exit 1
+          fi
+
+          if [ ! -f app/build/outputs/apk/debug/*.apk ]; then
+            exit 1
+          fi
+
+      - name: Kotlin Fehler kompakt anzeigen
+        if: steps.debug.outcome == 'failure'
+        run: |
+          echo "===== KOMPILIERFEHLER ====="
+          grep -n -E \
+            "^(e: |.*\.kt:[0-9]+:|.*\.java:[0-9]+:|Caused by:|FAILURE:|BUILD FAILED)" \
+            debug.log | head -n 80 || true
+
+          echo "===== LETZTE FEHLERZEILEN ====="
+          tail -n 40 debug.log
 
       - name: Unit Tests
+        if: steps.debug.outcome == 'success'
+        continue-on-error: true
         run: |
           cd "$PROJECT_DIR"
-          gradle --refresh-dependencies test
+          gradle test --stacktrace \
+            > "$GITHUB_WORKSPACE/tests.log" 2>&1
 
       - name: Release APK bauen
+        if: steps.debug.outcome == 'success'
+        continue-on-error: true
         run: |
           cd "$PROJECT_DIR"
-          gradle --refresh-dependencies assembleRelease
+          gradle assembleRelease --stacktrace \
+            > "$GITHUB_WORKSPACE/release.log" 2>&1
+
+      - name: Build Logs speichern
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SecureBrowse-Build-Logs
+          path: |
+            debug.log
+            tests.log
+            release.log
+          if-no-files-found: ignore
 
       - name: APKs hochladen
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: SecureBrowse-APKs
           path: |
             **/build/outputs/apk/debug/*.apk
             **/build/outputs/apk/release/*.apk
+          if-no-files-found: ignore
+
+      - name: Build Status
+        if: steps.debug.outcome == 'failure'
+        run: |
+          echo "Debug-Build fehlgeschlagen."
+          echo "Kompakte Fehlermeldungen wurden oben ausgegeben."
+          exit 1
