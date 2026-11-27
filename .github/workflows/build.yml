@@ -47,14 +47,43 @@ jobs:
           echo "PROJECT_DIR=$DIR" >> "$GITHUB_ENV"
           echo "Projekt gefunden: $DIR"
 
+      - name: Bekannte Projektfehler reparieren
+        run: |
+          python3 - <<'PY'
+          import os, re
+          root = os.environ["PROJECT_DIR"]
+
+          toml = os.path.join(root, "gradle", "libs.versions.toml")
+          if os.path.exists(toml):
+              out = []
+              for line in open(toml, encoding="utf-8").read().splitlines():
+                  if "material-icons-extended" in line:
+                      line = re.sub(r'version\.ref\s*=\s*"[^"]*"|version\s*=\s*"[^"]*"', 'version = "1.7.8"', line)
+                  out.append(line)
+              open(toml, "w", encoding="utf-8").write("\n".join(out) + "\n")
+
+          for dirpath, dirs, files in os.walk(root):
+              dirs[:] = [d for d in dirs if d not in ("build", ".gradle", "llama.cpp")]
+              for name in files:
+                  if name == "PromptSafety.kt":
+                      p = os.path.join(dirpath, name)
+                      s = open(p, encoding="utf-8").read()
+                      s = s.replace("'" + chr(92) * 2 + "u", "'" + chr(92) + "u")
+                      open(p, "w", encoding="utf-8").write(s)
+                      print("repariert:", p)
+          PY
+          grep -n "icons" "$PROJECT_DIR/gradle/libs.versions.toml" || true
+
       - name: Gradle 9.1.0 installieren
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '9.1.0'
 
+      - name: Android SDK einrichten
+        uses: android-actions/setup-android@v3
+
       - name: NDK und CMake installieren
         run: |
-          yes | sdkmanager --licenses > /dev/null || true
           sdkmanager "ndk;28.2.13676358" "cmake;3.22.1"
 
       - name: Debug APK bauen
