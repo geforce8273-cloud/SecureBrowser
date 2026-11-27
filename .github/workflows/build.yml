@@ -58,17 +58,57 @@ jobs:
           echo "SDK: $ANDROID_HOME"
           ls "$ANDROID_HOME"
 
-      - name: Compose Icons Version korrigieren
+      - name: Icons-Abhängigkeit korrigieren
         run: |
-          find "$PROJECT_DIR" -type f \
-            \( -name "*.gradle" \
-            -o -name "*.gradle.kts" \
-            -o -name "*.toml" \) \
-            -exec sed -i \
-            '/material-icons-extended/s/1\.9\.4/1.7.8/g' {} +
+          python3 - <<'PY'
+          import os
 
-          echo "Prüfung der Icons-Abhängigkeit:"
-          grep -R "material-icons-extended" "$PROJECT_DIR" || true
+          project = os.environ.get("PROJECT_DIR")
+          if not project:
+              print("PROJECT_DIR fehlt")
+              exit(1)
+
+          extensions = (".gradle", ".gradle.kts", ".toml")
+
+          for root, dirs, files in os.walk(project):
+              dirs[:] = [d for d in dirs if d not in
+                         ("build", ".gradle")]
+
+              for name in files:
+                  if not name.endswith(extensions):
+                      continue
+
+                  path = os.path.join(root, name)
+
+                  try:
+                      with open(path, "r", encoding="utf-8") as f:
+                          content = f.read()
+                  except Exception:
+                      continue
+
+                  updated = content.replace("1.9.4", "1.7.8")
+
+                  if updated != content:
+                      with open(path, "w", encoding="utf-8") as f:
+                          f.write(updated)
+                      print("Version geändert:", path)
+
+          print("Suche nach Icons-Abhängigkeit:")
+          for root, dirs, files in os.walk(project):
+              dirs[:] = [d for d in dirs if d not in
+                         ("build", ".gradle")]
+
+              for name in files:
+                  if name.endswith(extensions):
+                      path = os.path.join(root, name)
+                      try:
+                          with open(path, encoding="utf-8") as f:
+                              for line in f:
+                                  if "material-icons-extended" in line:
+                                      print(path, ":", line.strip())
+                      except Exception:
+                          pass
+          PY
 
       - name: Debug APK bauen
         run: |
